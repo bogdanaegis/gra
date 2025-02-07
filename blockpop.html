@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlockPop Frenzy</title>
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            text-align: center;
+            background: linear-gradient(to bottom, #1b2735, #090a0f);
+            color: white;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin: 20px;
+            font-size: 3rem;
+            text-shadow: 0 0 10px #fff, 0 0 20px #0ff, 0 0 30px #0ff;
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            gap: 5px;
+            justify-content: center;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 2px solid #0ff;
+            border-radius: 8px;
+            width: fit-content;
+            box-shadow: 0 0 20px #0ff;
+        }
+
+        .block {
+            width: 50px;
+            height: 50px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: white;
+            user-select: none;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .block.red { background-color: #e74c3c; }
+        .block.blue { background-color: #3498db; }
+        .block.green { background-color: #2ecc71; }
+        .block.yellow { background-color: #f1c40f; }
+
+        #score, #timer, #record {
+            font-size: 1.5rem;
+            margin: 10px;
+            text-shadow: 0 0 10px #fff;
+        }
+
+        #timer {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { color: white; }
+            50% { color: #ff6347; }
+            100% { color: white; }
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            background-color: #3498db;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #3498db;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+            transform: scale(1.1);
+        }
+
+        .roulette {
+            margin: 20px auto;
+            padding: 10px;
+            width: 150px;
+            height: 150px;
+            border: 5px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            background: radial-gradient(circle, #1b2735, #0ff);
+            color: white;
+            text-shadow: 0 0 10px #fff, 0 0 20px #0ff;
+        }
+
+        .end-message, .level-message, .special-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border: 3px solid #0ff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px #0ff;
+            z-index: 1000;
+            display: none;
+        }
+
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            opacity: 0.8;
+            border-radius: 50%;
+            animation: twinkle 5s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 0.4; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h1>BlockPop Frenzy</h1>
+    <div id="score">Punkty: 0</div>
+    <div id="record">Rekord: 0</div>
+    <div id="timer">Pozostały czas: 0</div>
+    <div class="roulette" id="target-color">?</div>
+    <div class="game-container" id="game-container"></div>
+    <button id="start-button" onclick="startGame()">Rozpocznij grę</button>
+    <div class="end-message" id="end-message"></div>
+    <div class="level-message" id="level-message">Poziom ukończony!</div>
+    <div class="special-message" id="special-message"></div>
+    <div class="stars" id="stars"></div>
+
+    <script>
+        const colors = ["red", "blue", "green", "yellow"];
+        const gridSize = 8;
+        let score = 0;
+        let record = 0;
+        let timeLeft = 0;
+        let targetColor = "";
+        let gameInterval;
+        let speedFactor = 1;
+        let isGameActive = false;
+
+        const gameContainer = document.getElementById("game-container");
+        const scoreDisplay = document.getElementById("score");
+        const recordDisplay = document.getElementById("record");
+        const timerDisplay = document.getElementById("timer");
+        const targetColorDisplay = document.getElementById("target-color");
+        const endMessage = document.getElementById("end-message");
+        const levelMessage = document.getElementById("level-message");
+        const specialMessage = document.getElementById("special-message");
+        const starsContainer = document.getElementById("stars");
+        const startButton = document.getElementById("start-button");
+
+        // Create stars background
+        function createStars() {
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement("div");
+                star.classList.add("star");
+                star.style.left = Math.random() * 100 + "%";
+                star.style.top = Math.random() * 100 + "%";
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // Initialize the game grid
+        function createGrid() {
+            gameContainer.innerHTML = "";
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                const block = document.createElement("div");
+                block.classList.add("block", colors[Math.floor(Math.random() * colors.length)]);
+                block.addEventListener("click", () => handleBlockClick(i));
+                gameContainer.appendChild(block);
+            }
+        }
+
+        // Handle block click
+        function handleBlockClick(index) {
+            if (!isGameActive) return;
+
+            const blocks = Array.from(gameContainer.children);
+            const clickedBlock = blocks[index];
+            const color = clickedBlock.classList[1];
+
+            if (color === targetColor) {
+                clickedBlock.classList.remove("red", "blue", "green", "yellow");
+                clickedBlock.style.backgroundColor = "#ecf0f1"; // Gray out the block
+                updateScore(1);
+                setRandomTargetColor(); // Set a new target color
+                timeLeft = Math.floor(Math.random() * 3) + 3; // Reset time limit
+
+                if (blocks.every(block => block.style.backgroundColor === "rgb(236, 240, 241)")) {
+                    showLevelMessage();
+                    setTimeout(() => {
+                        speedFactor *= 0.9;
+                        createGrid();
+                        setRandomTargetColor();
+                        startTimer();
+                    }, 1000);
+                }
+            } else {
+                endGame("Zły blok!");
+            }
+        }
+
+        // Set a random target color using the roulette effect
+        function setRandomTargetColor() {
+            let spinCount = 10; // Number of spins before stopping
+            const spinInterval = setInterval(() => {
+                targetColor = colors[Math.floor(Math.random() * colors.length)];
+                targetColorDisplay.textContent = targetColor.toUpperCase();
+                targetColorDisplay.style.color = targetColor;
+                spinCount--;
+                if (spinCount <= 0) {
+                    clearInterval(spinInterval);
+                }
+            }, 100);
+
+            // Set a random time limit between 3 and 5 seconds
+            timeLeft = Math.floor(Math.random() * 3) + 3;
+            updateTimer();
+        }
+
+        // Update score
+        function updateScore(points) {
+            score += points;
+            scoreDisplay.textContent = `Punkty: ${score}`;
+
+            if (score > record) {
+                record = score;
+                recordDisplay.textContent = `Rekord: ${record}`;
+            }
+
+            if (score % 50 === 0 && score !== 0) {
+                showSpecialMessage(score);
+            }
+        }
+
+        // Show special message
+        function showSpecialMessage(score) {
+            const messages = {
+                50: "DOBRA PASSA!",
+                100: "ŚWIETNY STREAK!",
+                200: "NIESAMOWITE!",
+                300: "JESTEŚ LEGENDĄ!"
+            };
+
+            specialMessage.textContent = messages[score] || "NIESAMOWITY WYNIK!";
+            specialMessage.style.display = "block";
+            specialMessage.style.animation = "fadeIn 0.5s";
+            setTimeout(() => {
+                specialMessage.style.display = "none";
+            }, 2000);
+        }
+
+        // Timer countdown
+        function startTimer() {
+            clearInterval(gameInterval);
+            gameInterval = setInterval(() => {
+                timeLeft -= speedFactor;
+                updateTimer();
+                if (timeLeft <= 0) {
+                    endGame("Czas się skończył!");
+                }
+            }, 1000);
+        }
+
+        function updateTimer() {
+            timerDisplay.textContent = `Pozostały czas: ${Math.ceil(timeLeft)}`;
+        }
+
+        // Show level complete message
+        function showLevelMessage() {
+            levelMessage.style.display = "block";
+            levelMessage.style.animation = "fadeIn 0.5s";
+            setTimeout(() => {
+                levelMessage.style.display = "none";
+            }, 1000);
+        }
+
+        // End the game
+        function endGame(message) {
+            clearInterval(gameInterval);
+            isGameActive = false;
+            endMessage.textContent = `${message} Twój wynik: ${score}`;
+            endMessage.style.display = "block";
+            startButton.textContent = "Zagraj ponownie";
+            startButton.style.display = "inline-block";
+        }
+
+        // Reset game
+        function resetGame() {
+            score = 0;
+            speedFactor = 1;
+            scoreDisplay.textContent = `Punkty: ${score}`;
+            createGrid();
+            setRandomTargetColor();
+            startTimer();
+        }
+
+        // Start the game
+        function startGame() {
+            score = 0;
+            isGameActive = true;
+            speedFactor = 1;
+            scoreDisplay.textContent = `Punkty: ${score}`;
+            endMessage.style.display = "none";
+            startButton.style.display = "none";
+            createGrid();
+            setRandomTargetColor();
+            startTimer();
+        }
+
+        createStars();
+    </script>
+</body>
+</html>
